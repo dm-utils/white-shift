@@ -1,12 +1,9 @@
-extends Node
+extends WhiteTestRunner
 ## Test runner: godot --headless --path . res://tests/run_tests.tscn
 ## Prints "tests: N passed, M failed" and exits with 1 when anything failed.
 
-var _passed := 0
-var _failed := 0
 
-
-func _ready() -> void:
+func _run() -> void:
 	test_example_from_design()
 	test_rules()
 	test_fast_swipe_matches_reference()
@@ -18,16 +15,6 @@ func _ready() -> void:
 	test_share_line()
 	test_puzzle_data()
 	await preload("res://tests/extra_tests.gd").new().run(check, self)
-	print("tests: %d passed, %d failed" % [_passed, _failed])
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func check(ok: bool, what: String) -> void:
-	if ok:
-		_passed += 1
-	else:
-		_failed += 1
-		printerr("FAIL: " + what)
 
 
 func example() -> ShiftBoard:
