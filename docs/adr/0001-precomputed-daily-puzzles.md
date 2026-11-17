@@ -35,3 +35,10 @@ shipped puzzle; CI warns when fewer than 14 days are built ahead.
 - Someone has to build days ahead; when the data runs out the game shows "no puzzle today" (practice still works).
   Currently built through 2027-01-15.
 - Changing the generator does not change already shipped puzzles; published days must not be regenerated.
+
+## Note (2026-11-17)
+
+Since ADR 0005 the generator uses White Kit's `WhiteRng`. The data published before that date was built with the
+former generator and can no longer be rebuilt from the current code; it is still checked by the tests. "Can be
+rebuilt" applies to days built from 2026-11-17 on. New days are added with `build_puzzles.gd --merge`, which refuses
+to change a published key.

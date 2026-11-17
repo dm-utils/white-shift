@@ -1,6 +1,7 @@
 # White Shift - design
 
-Status: phase 1 (digital prototype), built and playable at https://play.whiteshift.steefbeest.nl.
+Status: phase 1 (digital prototype), built and playable at https://play.whiteshift.steefbeest.nl. Built on White Kit
+v0.1.0 since 2026-11-17 (section 13, ADR 0005).
 This document describes the game as decided and built. Decisions with their trade-offs are in `docs/adr/`;
 terms are defined in `docs/glossary.md`; code and test rules are in `docs/conventions.md`.
 
@@ -77,7 +78,8 @@ the right wall.
 - Undo returns to the state before the last effective swipe. Restart returns to the start position and clears
   the undo history (undo cannot go back across a restart).
 - Undo and restart are free, but they never lower the count: every effective swipe made in the attempt counts,
-  including swipes that were later undone or discarded by a restart. See ADR 0002.
+  including swipes that were later undone or discarded by a restart. See ADR 0002. In White Kit terms this is the
+  count mode `EVERY_MOVE`, used for daily and practice puzzles alike.
 - Undo and restart are only possible when there is history and the puzzle is not solved; otherwise they are
   no-ops and are not recorded.
 
@@ -121,6 +123,11 @@ board, not of the state.
 `ShiftBoard.swipe_reference()` is a straightforward version (sort movable pieces by leading edge, slide each).
 Both must return identical states for every board, state and direction; the tests enforce this.
 
+`ShiftBoard` also implements White Kit's rules interface (`extends WhiteRules`, kit design 5.6), so the kit's attempt
+can play it: `start_state()` is `start`; `apply(state, dir)` is `swipe(state, dir)`, or `null` for a no-op swipe;
+`is_solved(state)` is `is_won(state)`; a move is a direction `0..3` and its token is one letter of `LETTERS`
+(`R L D U`).
+
 ### 4.3 Solver (`ShiftSolver.solve`)
 
 - Breadth-first search over reachable states, layer by layer; a no-op swipe is not an edge.
@@ -131,19 +138,29 @@ Both must return identical states for every board, state and direction; the test
 
 ### 4.4 Generator (`ShiftGenerator.generate`)
 
-- Input: a 64-bit seed and a level. The seed is FNV-1a 64-bit over the UTF-8 bytes of a text:
+- Input: a 64-bit seed and a level. The seed is FNV-1a 64-bit over the UTF-8 bytes of a text
+  (`ShiftGenerator.seed_for`, which calls `WhiteSeed.fnv1a64` from White Kit):
   - daily puzzle: `white-shift|<YYYY-MM-DD>|<level>` (level `0`, `1` or `2`), e.g. `white-shift|2026-11-17|2`;
   - practice set: `white-shift-practice|<i>|<level>`.
   FNV-1a was chosen so another implementation (a server) can compute the same seed.
-- The seed initialises Godot's `RandomNumberGenerator`. Reproducing a board from a seed therefore requires the
-  same generator code and the same RNG; a seed alone is not a portable puzzle description. The board JSON
-  (section 5.2) is the portable form.
+- The seed initialises White Kit's `WhiteRng` (xoshiro128**, integer-only, kit ADR 0002). Its output for a seed is
+  frozen and checked against a Python reference, so the sequence of random numbers is the same on every platform and
+  Godot version. Reproducing a board from a seed requires the same generator code (`ShiftGenerator`, including
+  `LEVELS` and `MIX`) and `WhiteRng`; with those, any implementation can rebuild it. The board JSON (section 5.2)
+  remains the portable form of a published puzzle.
+- Random draws: `rng.range_int(a, b)` (inclusive) for sizes, sides, indexes, counts and cells; `rng.next_float()` for
+  the piece kind and bar length rolls.
 - Loop up to "layouts tried" times: draw a random layout (board size, exit side and index, pins, white stone,
   other pieces), discard it unless it has both bar kinds, solve it, and return the first layout whose par is in
   the band and whose shortest-solution count is within the maximum.
-- Fallback when no layout fits: the layout nearest to the band (then fewest shortest solutions). In the trial no
-  fallback was needed (10 of 10 days in band; median 2 / 5 / 8 layouts tried for easy / medium / hard).
+- Fallback when no layout fits: the layout nearest to the band (then fewest shortest solutions). In the original
+  trial no fallback was needed (10 of 10 days in band; median 2 / 5 / 8 layouts tried for easy / medium / hard).
+  After the switch to `WhiteRng`, `tools/measure.gd --days=30` gave 30 of 30 days in band without fallback on every
+  level; par ranges easy 4-7, medium 8-12, hard 13-22.
 - Fully deterministic: the same seed and level give the same puzzle on every machine running the same code.
+- History: until 2026-11-17 the generator used Godot's `RandomNumberGenerator`. All puzzles published in `data/` were
+  built with that version (section 5.2). The current generator gives different boards for the same seeds; the
+  published data is not regenerated (ADR 0001, ADR 0005).
 
 ## 5. Precomputed puzzles
 
@@ -151,13 +168,17 @@ Both must return identical states for every board, state and direction; the test
 
 Generation time on a desktop PC: easy about 3 ms, medium about 0.2 s (max 10 s), hard about 6 s (max 22 s). That
 is too slow for a phone browser. Puzzles are therefore computed ahead of time and shipped with the game; the game
-itself never searches. See ADR 0001.
+itself never searches. See ADR 0001. (Medians measured after the switch to `WhiteRng`, on a busy machine:
+13 ms / 0.18 s / 3.6 s; a precompute concern only.)
 
 ### 5.2 Files and format
 
-- `data/daily.json`: daily puzzles by date. Currently 60 days, 2026-11-17 to 2027-01-15.
-- `data/practice.json`: practice sets keyed `"0"`, `"1"`, ...; currently 45 sets. The game picks a set by its
-  position in the file (keys are stored sorted as text), not by the numeric key.
+- `data/daily.json`: daily puzzles by date. Currently 60 days, 2026-11-17 to 2027-01-15, all built with the former
+  `RandomNumberGenerator` generator.
+- `data/practice.json`: practice sets keyed `"0"`, `"1"`, ...; currently 45 sets, built with the former generator.
+  The game picks a set by its position in the file (keys are stored sorted as text), not by the numeric key.
+- Days and sets added from now on are built with the `WhiteRng` generator and merged (section 5.3). The file does not
+  record which generator built a key; the format and the checks are the same for both.
 - Both: `{"<key>": [easy, medium, hard]}`, each puzzle:
 
 ```json
@@ -171,13 +192,31 @@ itself never searches. See ADR 0001.
 
 `side` uses the direction codes `R=0, L=1, D=2, U=3`; `kind` uses the piece codes of section 2.2 (the white stone
 is the first piece); `len` is 1 for the white stone and blocks; `path` is one shortest solution in direction
-letters.
+letters. All numbers are JSON integers.
+
+Loading: `ShiftPuzzles` keeps its public functions (`has_day`, `day`, `practice_count`, `practice`) and delegates to
+one `WhitePuzzleStore` (kit design 5.5) with `ShiftPuzzles._puzzle` as converter (board dictionary to `ShiftBoard`,
+path letters to directions).
 
 ### 5.3 Build tool
 
-`tools/build_puzzles.gd` (headless, see README and conventions) writes a fresh file for a date range or a range of
-practice sets. It does not append: new days are built to `build/` and merged into `data/daily.json`. Days that
-are already published are never regenerated (a generator change would change them).
+`tools/build_puzzles.gd` extends White Kit's `WhitePrecompute` (kit design 5.14). It only provides `_game_id()`
+(`"white-shift"`) and `_generate(seed, level)`, which calls `ShiftGenerator.generate` and returns
+`{board, par, solutions, path}`. Argument handling, seed texts, output and merging come from the kit:
+
+```
+--from=YYYY-MM-DD [--days=N] --out=<file>     build daily puzzles for N days (default 1)
+--practice=N [--start=S] --out=<file>         build practice sets S..S+N-1
+--merge=<built file> --into=<data file>       add new keys to a published file
+```
+
+- Build mode writes a fresh file and prints `<key> par [p0, p1, p2]` per key.
+- New days are built to `build/` and merged into `data/daily.json` with `--merge`. The merge appends keys that are not
+  in the data file yet, skips keys whose puzzles are identical, and refuses (exit code 1, nothing written) when a built
+  key differs from a published one. Existing keys keep their order and bytes.
+- Because the current generator gives different boards than the one that built the published data, rebuilding a
+  published date and merging it is always refused. Only new dates and new practice indexes can be added. Days that
+  are already published are never regenerated.
 
 CI reports how many days are built from today on and warns when fewer than 14 remain.
 
@@ -189,10 +228,11 @@ accepted for the prototype; later the server delivers the daily puzzle (section 
 ## 6. The Dutch calendar day
 
 - The current puzzle day is the calendar date in the Netherlands (CET/CEST), computed on the device from the
-  system clock without any network call (`ShiftDaily.date_at`).
+  system clock without any network call (`ShiftDaily.date_at`, which calls `WhiteDaily.date_at` from White Kit).
 - Offset rule (EU): UTC+2 from the last Sunday of March 01:00 UTC until the last Sunday of October 01:00 UTC,
   UTC+1 otherwise.
-- Puzzle number: `#1` is 2026-11-17; the number is the day count since then plus one.
+- Puzzle number: `#1` is 2026-11-17 (`ShiftDaily.FIRST_DAY`); the number is the day count since then plus one
+  (`ShiftDaily.number`, which calls `WhiteDaily.number(date, FIRST_DAY)`).
 - When `data/daily.json` has no entry for today, the game says so and offers practice.
 
 See ADR 0003.
@@ -200,7 +240,9 @@ See ADR 0003.
 ## 7. Attempt and record
 
 `ShiftAttempt` holds one player's attempt at one puzzle: current state, undo history, swipe count, time and the
-record.
+record. It extends White Kit's `WhiteAttempt` (kit design 5.7) in count mode `EVERY_MOVE`, and keeps the White Shift
+names: `board`, `swipe(dir)` (= `play`), `swipes` (= `count()`) and `ShiftAttempt.replay(board, record)` (a new
+attempt plus `apply_record`).
 
 ### 7.1 Record format
 
@@ -216,6 +258,9 @@ No-op swipes, and undo/restart when they are not possible, are not written. Repl
 position (`ShiftAttempt.replay`) rebuilds the exact attempt, including the count. Unknown characters are ignored.
 The swipe count equals the number of `R`/`L`/`D`/`U` characters.
 
+This is White Kit's record grammar (kit design 6.1) with move tokens of length 1. Other lower-case letters are
+reserved for future kit actions and ignored on replay, as before.
+
 Example: the record `DRzUrDR` means swipe down, swipe right, undo, swipe up, restart, swipe down, swipe right:
 5 swipes.
 
@@ -225,11 +270,14 @@ the server replays the record against the puzzle and computes the count itself. 
 ### 7.2 Time
 
 `time_ms` runs while a level is on screen, starting at its first effective swipe, and stops when the puzzle is
-solved or the player switches level or mode. It is informational only; it does not affect the score.
+solved or the player switches level or mode. It is informational only; it does not affect the score. The clock is
+kept by the kit's day screen.
 
 ## 8. Saved progress
 
 - File: `user://progress.json` (browser storage on the web build, the user data folder elsewhere).
+- Read, sanitised and written by White Kit's `WhiteProgress` (kit design 5.8); the format is unchanged, and files
+  written before and after the switch to the kit are interchangeable.
 - Format:
 
 ```json
@@ -245,9 +293,11 @@ solved or the player switches level or mode. It is informational only; it does n
 }
 ```
 
-- Written after every effective swipe, undo, restart and level switch. On opening a day the records are replayed,
-  so a reload continues exactly where the player was. The `solved` flag is derived and informational; replay is
-  authoritative.
+- Written after every effective swipe, undo, restart and level switch, and after a language change. On opening a day
+  the records are replayed, so a reload continues exactly where the player was. The `solved` flag is derived and
+  informational; replay is authoritative.
+- A damaged file never stops the game: a file that is not JSON, or parts with the wrong structure, are replaced by
+  empty values and whatever is usable is kept (fix ce16f44, now in `WhiteProgress.sanitize`).
 - Practice attempts are not saved. Debug screenshot runs save nothing.
 
 ## 9. User interface
@@ -284,15 +334,40 @@ movement of every piece is visible on the piece.
 - Debug screenshot mode: `-- --shot=<png> [--date=YYYY-MM-DD] [--practice] [--level=N] [--keys=RLDUzr] [--lang=en]
   [--best]`.
 
+Implementation on White Kit (kit design 5.12, kit ADR 0004):
+
+- `ui/main.gd` extends `WhiteDayScreen`, which holds the layout, the screen flow, the clock, saving, practice, the
+  language toggle, sharing and the debug screenshot mode. `ui/main.tscn` is unchanged.
+- `main.gd` implements only the hooks: `_game_id` (`"white-shift"`), `_game_title` (`"WHITE SHIFT"`), `_first_day`
+  (`ShiftDaily.FIRST_DAY`), `_texts` (`Strings.TEXT`), `_load_day`, `_load_practice`, `_practice_count` (through
+  `ShiftPuzzles`), `_new_attempt` (`ShiftAttempt.new(puzzle.board)`, count mode ignored), `_make_view` (a `BoardView`
+  whose `swiped` signal calls `_on_move`), `_view_show`, `_view_clear`, `_view_update`, `_extra_buttons` (the Best
+  route button), `_hint_text` (`hint` plus `rule_more`), `_key_move` (arrow keys and WASD) and `_on_debug_extra`
+  (`--best`). It keeps `best_btn`, `_show_best` and `_on_swipe_all_best`.
+- The Best route button's text is set from the screen's `refreshed` signal, so it follows the language toggle.
+- Texts: `Strings.TEXT` is registered with `WhiteText`; the counter key is `count` (was `swipes`). `Strings.t`,
+  `Strings.lang`, `Strings.clock` and `Strings.share_line` remain as thin wrappers over `WhiteText` and `WhiteFormat`
+  because the tests call them. White Shift defines no `count_final` and keeps the default `_play_message`.
+- Look: the colours, sizes and spacing come from `WhiteTheme` and `WhiteUi`; they are the values White Shift had.
+
 ## 10. Build and deployment
 
-- CI (`.github/workflows/ci.yml`) on pushes to `develop` and `main`, pull requests to `main` and manual runs:
-  download Godot 4.7.2 (SHA-512 verified, cached), `--import`, run the tests headless, report remaining daily
-  puzzle days, export the Web build (release) as an artifact.
+- CI (`.github/workflows/ci.yml`, from White Kit's `templates/ci.yml`) on pushes to `develop` and `main`, pull
+  requests to `main` and manual runs:
+  1. checkout with submodules;
+  2. kit pin check: `addons/white_kit` must be exactly the commit of tag `v<VERSION>` of the kit; the version is
+     written to the run summary;
+  3. Godot 4.7.2 through the kit's composite action `addons/white_kit/ci/setup-godot` (SHA-512 verified, cached);
+  4. `--import`; kit tests (`res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=250`); game tests
+     (`res://tests/run_tests.tscn -- --min-checks=177`, the `MIN_CHECKS` variable);
+  5. report remaining daily puzzle days (warning below 14);
+  6. export the Web build (release) as an artifact.
+- The export preset excludes `tests/*`, `tools/*`, `addons/white_kit/tests/*` and `addons/white_kit/tools/*`, so no
+  test, fixture or tool code ships.
 - On `develop` (not on pull requests) the Web build is published to GitHub Pages, served at
   https://play.whiteshift.steefbeest.nl (custom domain via a DNS record in the existing zone).
 - No Android or Windows builds in phase 1.
-- Cost: none (public repository; Pages and Actions are free for public repositories).
+- Cost: none (public repositories; Pages and Actions are free for public repositories).
 
 ## 11. Roadmap
 
@@ -306,7 +381,8 @@ movement of every piece is visible on the piece.
 
 From phase 4 the server delivers the daily puzzle instead of the repository (which also stops looking ahead),
 and results are submitted as attempt records that the server replays to verify the count. st33f-engine is a
-separate, private backend; this repository only depends on its public interface once that phase starts.
+separate, private backend; this repository only depends on its public interface once that phase starts. The seams
+for this are White Kit's (kit design section 11).
 Accounts for players aged 10-15 require the owner's approval before phase 4 starts.
 
 ## 12. Acceptance criteria
@@ -316,8 +392,8 @@ Rules (`sim/board.gd`)
 - A horizontal bar never changes `y`; a vertical bar never changes `x`; pins never move.
 - A non-white piece never leaves the board; the exit acts as wall for it.
 - The white stone leaves only on a swipe towards the exit wall in the exit row/column.
-- A no-op swipe returns a state equal to the input.
-- `swipe()` and `swipe_reference()` agree on random boards, states and directions.
+- A no-op swipe returns a state equal to the input; `apply` returns `null` for it.
+- `swipe()` and `swipe_reference()` agree on random boards, states and directions (random input from `WhiteRng`).
 - `to_dict()` / `from_dict()` round-trip a board exactly.
 
 Solver and generator
@@ -326,11 +402,15 @@ Solver and generator
 - `generate(seed, level)` returns an identical board, par and path when called twice.
 - `seed_for` equals FNV-1a 64-bit of the UTF-8 text (reference value checkable outside Godot).
 - Generated boards contain at least one horizontal and one vertical bar.
+- `tools/measure.gd -- --days=30`: each level fits its band without fallback on at least 27 of 30 seeds.
 
 Shipped puzzles
 - Every puzzle in `data/daily.json` and `data/practice.json` is a valid board; replaying `path` wins in exactly
-  `par` swipes; the solver confirms `par` and `solutions`; par lies in the level band.
+  `par` swipes; the solver confirms `par` and `solutions`; par lies in the level band. These checks do not regenerate
+  puzzles, so they hold for data from either generator.
 - Every date from 2026-11-17 through the last built date is present with three puzzles.
+- A merge of newly built days leaves the bytes of every existing key unchanged; a merge of a rebuilt published day is
+  refused.
 
 Day and attempt
 - `date_at` switches date at 23:00 UTC in winter and 22:00 UTC in summer, including the DST change days.
@@ -342,4 +422,38 @@ Day and attempt
 UI and deployment (manual or screenshot)
 - After a reload, a partly played day shows the same position, count and record.
 - Without a puzzle for today the game shows the no-puzzle message and practice works.
-- CI on `develop` is green and the play version at https://play.whiteshift.steefbeest.nl loads and plays.
+- After a language toggle on a solved level, the Best route button shows the text of the new language.
+- CI on `develop` is green (kit pin, kit tests, game tests) and the play version at
+  https://play.whiteshift.steefbeest.nl loads and plays.
+
+## 13. White Kit
+
+White Shift is built on White Kit, the shared base of the White daily puzzle games, included as a git submodule at
+`addons/white_kit` and pinned to a release tag (now `v0.1.0`). The kit's design is in its own repository
+(`docs/design.md` there); this section only records how White Shift uses it. Decision: ADR 0005.
+
+| White Shift code | Kit class it uses | What stays in White Shift |
+|---|---|---|
+| `sim/daily.gd` (`ShiftDaily`) | `WhiteDaily` | `FIRST_DAY`; thin wrapper functions. |
+| `sim/generator.gd` (`ShiftGenerator`) | `WhiteSeed`, `WhiteRng` | `LEVELS`, `MIX`, layout drawing, the fit loop. |
+| `sim/puzzles.gd` (`ShiftPuzzles`) | `WhitePuzzleStore` | File paths and the puzzle converter `_puzzle`. |
+| `sim/board.gd` (`ShiftBoard`) | `WhiteRules` (extends) | All rules, both swipe implementations. |
+| `sim/attempt.gd` (`ShiftAttempt`) | `WhiteAttempt` (extends) | The names `board`, `swipe`, `swipes`, `replay`. |
+| `sim/solver.gd` (`ShiftSolver`) | - | Everything. |
+| `ui/main.gd` | `WhiteDayScreen` (extends), `WhiteUi`, `WhiteProgress` | Hooks, Best route animation. |
+| `ui/strings.gd` (`Strings`) | `WhiteText`, `WhiteFormat` | All texts (`TEXT`); thin wrapper functions. |
+| `ui/board_view.gd` (`BoardView`) | - | Everything. |
+| `tools/build_puzzles.gd` | `WhitePrecompute` (extends) | `_game_id`, `_generate`. |
+| `tools/measure.gd` | - | Everything. |
+| `tests/run_tests.gd` | `WhiteTestRunner` (extends) | All game tests. |
+| `.github/workflows/ci.yml` | `templates/ci.yml`, `ci/setup-godot` | Header comment, `MIN_CHECKS`. |
+
+- The wrappers `ShiftDaily`, `ShiftPuzzles`, `ShiftAttempt` and `Strings` stay because the tests call them by these
+  names. Removing them is a separate task together with a test update.
+- Updating the kit follows the kit's procedure (kit design section 8): check out the new tag in the submodule, run
+  kit and game tests, commit `chore: update White Kit to v<new>`. A kit update must keep the 177 game checks green and
+  the screenshots of the kit's migration acceptance pixel-identical, unless the kit's changelog announces a visible
+  change.
+- Planned kit 0.2.0 (practice-only hook for White Tally, test runner counting script errors) needs no code change in
+  White Shift; after updating, a script error that was silently skipped in a test would now fail the run and is then a
+  test finding.
