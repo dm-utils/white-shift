@@ -1,6 +1,7 @@
 class_name Strings
 extends RefCounted
-## Dutch and English texts. Small enough to keep in code for the prototype.
+## Dutch and English texts. Small enough to keep in code for the prototype. The table is registered with WhiteText;
+## the key "count" (was "swipes") is the one the shared screen reads.
 
 const TEXT := {
 	"nl": {
@@ -8,7 +9,7 @@ const TEXT := {
 		"today": "Dagpuzzel #%d",
 		"practice": "Oefenen",
 		"daily": "Vandaag",
-		"swipes": "Vegen: %d",
+		"count": "Vegen: %d",
 		"par": "Par: %d",
 		"undo": "Terug",
 		"restart": "Opnieuw",
@@ -30,7 +31,7 @@ const TEXT := {
 		"today": "Daily puzzle #%d",
 		"practice": "Practice",
 		"daily": "Today",
-		"swipes": "Swipes: %d",
+		"count": "Swipes: %d",
 		"par": "Par: %d",
 		"undo": "Undo",
 		"restart": "Restart",
@@ -49,24 +50,21 @@ const TEXT := {
 	},
 }
 
-static var lang := "nl"
+static var lang: String: ## kept in WhiteText, which the shared screen reads
+	get:
+		return WhiteText.lang
+	set(value):
+		WhiteText.lang = value
 
 
 static func t(key: String) -> Variant:
-	return TEXT[lang][key]
+	return TEXT[WhiteText.lang][key]
 
 
 static func clock(ms: int) -> String:
-	var s := ms / 1000
-	return "%d:%02d" % [s / 60, s % 60]
+	return WhiteFormat.clock(ms)
 
 
 ## One line for all three puzzles of a day, without the solution. Unsolved levels show as "-".
 static func share_line(number: int, swipes: Array, pars: Array) -> String:
-	var a := PackedStringArray()
-	for s in swipes:
-		a.append("-" if s == null else str(s))
-	var b := PackedStringArray()
-	for p in pars:
-		b.append(str(p))
-	return t("share_line") % [number, "/".join(a), "/".join(b)]
+	return WhiteFormat.day_line(t("share_line"), number, swipes, pars)

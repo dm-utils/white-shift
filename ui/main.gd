@@ -254,7 +254,7 @@ func _refresh() -> void:
 		return
 	var a: ShiftAttempt = attempts[level]
 	var p: Dictionary = puzzles[level]
-	counter.text = Strings.t("swipes") % a.swipes
+	counter.text = Strings.t("count") % a.swipes
 	par_label.text = Strings.t("par") % p.par
 	clock_label.text = Strings.clock(_elapsed())
 	var solved := a.solved()
