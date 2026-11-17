@@ -1,5 +1,5 @@
 class_name ShiftBoard
-extends RefCounted
+extends WhiteRules
 ## The White Shift rules, without any scene: a walled board with one exit in the rim and pieces that slide.
 ##
 ## A swipe moves every piece that may move in that direction as far as it can, starting with the piece nearest to the
@@ -49,6 +49,31 @@ func add(kind: int, x: int, y: int, length: int = 1) -> int:
 
 func count() -> int:
 	return kinds.size()
+
+
+# --- WhiteRules: the move is a swipe direction (a Dir), the record letter is LETTERS[dir] ----------------------------
+
+func start_state() -> Variant:
+	return start
+
+
+## The new state, or null when the swipe moves nothing.
+func apply(state: Variant, move: Variant) -> Variant:
+	var next := swipe(state, move)
+	return null if next == state else next
+
+
+func is_solved(state: Variant) -> bool:
+	return is_won(state)
+
+
+func encode_move(move: Variant) -> String:
+	return LETTERS[move]
+
+
+func decode_move(token: String) -> Variant:
+	var i := LETTERS.find(token) if token.length() == 1 else -1
+	return i if i >= 0 else null
 
 
 static func can_move(kind: int, dir: int) -> bool:
