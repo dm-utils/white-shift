@@ -11,7 +11,8 @@ Play: https://play.whiteshift.steefbeest.nl
 
 ## Development
 
-Godot 4.7.2 (GDScript).
+Godot 4.7.2 (GDScript). The shared base is White Kit, a git submodule at `addons/white_kit` pinned to a release tag.
+Clone with `git clone --recurse-submodules`, or run `git submodule update --init` after a plain clone.
 
 ```bash
 godot --headless --path . --import                        # once after a fresh clone
