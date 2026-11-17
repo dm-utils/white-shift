@@ -18,11 +18,7 @@ const MIX := [0.3, 0.35, 0.35]
 
 
 static func seed_for(text: String) -> int:
-	# FNV-1a 64-bit over UTF-8, so a server can compute the same seed later
-	var hash_value := -3750763034362895579 # 0xcbf29ce484222325 as a signed 64-bit int
-	for b in text.to_utf8_buffer():
-		hash_value = (hash_value ^ b) * 1099511628211
-	return hash_value
+	return WhiteSeed.fnv1a64(text)
 
 
 ## Returns {board, par, solutions, path, tries}.
