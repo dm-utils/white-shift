@@ -21,6 +21,7 @@ func run(checker: Callable, node: Node) -> void:
 	test_puzzle_api()
 	test_shipped_data()
 	await test_ui_progress(node)
+	await test_damaged_progress(node)
 
 
 func board(w: int, h: int, side: int, index: int) -> ShiftBoard:
@@ -420,6 +421,122 @@ func test_ui_progress(node: Node) -> void:
 		m4.queue_free()
 		await node.get_tree().process_frame
 	# restore the real save
+	if had:
+		var f := FileAccess.open(save, FileAccess.WRITE)
+		f.store_string(backup)
+		f.close()
+	else:
+		DirAccess.remove_absolute(save)
+
+
+# --- damaged progress files: usable parts survive, the rest is dropped ---------------------------------------------
+
+func _route(day: Array, lv: int) -> String:
+	var r := ""
+	for dir in day[lv].path:
+		r += ShiftBoard.LETTERS[dir]
+	return r
+
+
+func _load_with(node: Node, scene: PackedScene, text: String) -> Control:
+	var f := FileAccess.open("user://progress.json", FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+	var m: Control = scene.instantiate()
+	node.add_child(m)
+	m.date = "2026-11-17"
+	m._open_day()
+	return m
+
+
+func test_damaged_progress(node: Node) -> void:
+	var save := "user://progress.json"
+	var had := FileAccess.file_exists(save)
+	var backup := FileAccess.get_file_as_string(save) if had else ""
+	var scene: PackedScene = load("res://ui/main.tscn")
+	var day := ShiftPuzzles.day("2026-11-17")
+	var r0 := _route(day, 0)
+	var r1 := _route(day, 1)
+
+	# valid day kept next to a damaged one
+	var txt := JSON.stringify({"lang": "en", "days": {"2026-11-17": [{"record": r0, "time_ms": 1234, "solved": true}, {}, {}],
+		"2026-11-18": 5, "2026-11-19": "x", "2026-11-20": null}})
+	var m := _load_with(node, scene, txt)
+	check.call(m.attempts[0].solved() and m.level == 1 and m.times[0] == 1234, "damaged: valid day survives damaged days")
+	check.call(m._save.lang == "en" and m._save.days.has("2026-11-17") and not m._save.days.has("2026-11-18")
+		and not m._save.days.has("2026-11-19") and not m._save.days.has("2026-11-20"), "damaged: language kept, bad days dropped")
+	m.queue_free()
+	await node.get_tree().process_frame
+
+	# valid level next to damaged levels in the same day
+	txt = JSON.stringify({"days": {"2026-11-17": [5, {"record": r1, "time_ms": 99}, null]}})
+	m = _load_with(node, scene, txt)
+	check.call(not m.attempts[0].solved() and m.attempts[1].solved() and m.times[1] == 99 and m.level == 0, "damaged: valid level survives damaged sibling levels")
+	m.queue_free()
+	await node.get_tree().process_frame
+
+	# field-level damage: null, wrong type, bad characters, odd numbers
+	var cases := {
+		"record null": {"record": null, "time_ms": 5},
+		"record number": {"record": 7, "time_ms": 5},
+		"record list": {"record": ["R"], "time_ms": 5},
+		"time null": {"record": r0, "time_ms": null},
+		"time string": {"record": r0, "time_ms": "9"},
+		"time negative": {"record": r0, "time_ms": -50},
+		"time huge": {"record": r0, "time_ms": 1e300},
+		"time fraction": {"record": r0, "time_ms": 12.7},
+		"record junk chars": {"record": "\u00e9\u0000 %s9?" % r0, "time_ms": 1},
+		"record very long": {"record": "R".repeat(100000), "time_ms": 1},
+		"extra keys": {"record": r0, "time_ms": 1, "solved": "yes", "foo": [1]},
+	}
+	for name in cases:
+		m = _load_with(node, scene, JSON.stringify({"days": {"2026-11-17": [cases[name], {}, {}]}}))
+		var ok: bool = m.puzzles.size() == 3 and m.attempts.size() == 3 and m.times[0] >= 0
+		check.call(ok, "damaged: field case '%s' loads with sane values (time %s)" % [name, str(m.times[0])])
+		if name in ["time null", "time string", "time negative", "record null", "record number", "record list"]:
+			check.call(m.times[0] == 0 or name.begins_with("record"), "damaged: '%s' gives time 0" % name)
+		if name == "record junk chars":
+			check.call(m.attempts[0].solved(), "damaged: junk characters in a record are ignored on replay")
+		m.queue_free()
+		await node.get_tree().process_frame
+
+	# list sizes
+	m = _load_with(node, scene, JSON.stringify({"days": {"2026-11-17": [{"record": r0}]}}))
+	check.call(m.attempts.size() == 3 and m.attempts[0].solved() and not m.attempts[1].solved() and m.times[1] == 0, "damaged: list with one level fills up")
+	m.queue_free()
+	await node.get_tree().process_frame
+	var many := []
+	for i in 7:
+		many.append({"record": r0, "time_ms": 1})
+	m = _load_with(node, scene, JSON.stringify({"days": {"2026-11-17": many}}))
+	check.call(m.attempts.size() == 3 and m.puzzles.size() == 3, "damaged: list with seven levels is cut to three")
+	m.queue_free()
+	await node.get_tree().process_frame
+
+	# empty and odd top level
+	for t in ["{\"days\": {}}", "{}", "", "   ", "null", "5", "\"x\"", "{\"days\": null, \"lang\": null}",
+			"{\"lang\": 5}", "{\"lang\": [\"en\"]}", "{\"days\": [1]}", "{\"days\": {\"2026-11-17\": [", "{\"a\": 1} trailing"]:
+		m = _load_with(node, scene, t)
+		check.call(m.puzzles.size() == 3 and m.attempts[0].swipes == 0 and m._save.lang == "nl", "damaged: top level '%s' gives a fresh day, lang nl" % t)
+		Strings.lang = "nl"
+		m.queue_free()
+		await node.get_tree().process_frame
+
+	# unknown language falls back and the game then writes a valid file again
+	m = _load_with(node, scene, JSON.stringify({"lang": "fr", "days": {"2026-11-17": [{"record": r0}, {}, {}]}}))
+	check.call(m._save.lang == "nl" and Strings.lang == "nl" and m.attempts[0].solved(), "damaged: unknown language falls back to nl, days kept")
+	m._on_swipe(m.puzzles[1].path[0])
+	var again = JSON.parse_string(FileAccess.get_file_as_string(save))
+	check.call(again is Dictionary and again.days["2026-11-17"].size() == 3 and again.days["2026-11-17"][0].record == r0, "damaged: next write is valid and keeps the good part")
+	m.queue_free()
+	await node.get_tree().process_frame
+
+	# idempotent: load, write, load gives the same state
+	var m5 := _load_with(node, scene, FileAccess.get_file_as_string(save))
+	check.call(m5.attempts[0].solved() and m5.attempts[1].swipes == 1, "damaged: reload of a rewritten file gives the same state")
+	m5.queue_free()
+	await node.get_tree().process_frame
+
 	if had:
 		var f := FileAccess.open(save, FileAccess.WRITE)
 		f.store_string(backup)
