@@ -1,0 +1,102 @@
+# CI: tests and the web build on develop/main, superseded runs cancelled. The release web build of develop is the
+# play version on GitHub Pages (play.whiteshift.steefbeest.nl). Prototype phase: no Android/Windows builds yet.
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.7.2"
+  # from https://github.com/godotengine/godot/releases/download/4.7.2-stable/SHA512-SUMS.txt
+  GODOT_SHA512_EDITOR: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+  GODOT_SHA512_TEMPLATES: ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Godot ${{ env.GODOT_VERSION }}
+        id: godot-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-${{ env.GODOT_SHA512_EDITOR }}
+
+      - name: Download Godot (SHA-512 checked)
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSfLO "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -sSfLO "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          echo "${GODOT_SHA512_EDITOR}  Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" | sha512sum -c -
+          echo "${GODOT_SHA512_TEMPLATES}  Godot_v${GODOT_VERSION}-stable_export_templates.tpz" | sha512sum -c -
+          unzip -q "Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          rm -f ./*.zip ./*.tpz
+
+      - name: Install Godot
+        run: |
+          sudo ln -sf ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p ~/.local/share/godot/export_templates
+          ln -sfn ~/godot/templates ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          godot --version
+
+      - name: Import project
+        run: timeout 600 godot --headless --path . --import
+
+      - name: Tests (rules, solver, generator, daily dates, every shipped puzzle re-checked)
+        run: timeout 300 godot --headless --path . res://tests/run_tests.tscn
+
+      - name: Puzzles left (warn when fewer than 14 days are built ahead)
+        run: |
+          left=$(python3 -I -c "import json,datetime; d=json.load(open('data/daily.json')); t=datetime.date.today().isoformat(); print(sum(1 for k in d if k>=t))")
+          echo "Daily puzzles built from today on: $left" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$left" -lt 14 ]; then echo "::warning::only $left days of daily puzzles left; run tools/build_puzzles.gd"; fi
+
+      - name: Export Web
+        run: |
+          mkdir -p build/web && touch build/.gdignore
+          timeout 600 godot --headless --path . --export-release "Web" build/web/index.html
+          ls -la build/web | awk '{print "    " $5 "  " $9}' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web
+          path: build/web
+          retention-days: 7
+
+      - name: Play version for GitHub Pages (develop only)
+        if: github.ref == 'refs/heads/develop' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+  # GitHub Pages: free for public repos, files up to 100 MB (the 38 MB engine wasm fits)
+  pages:
+    needs: build
+    if: github.ref == 'refs/heads/develop' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
