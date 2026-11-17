@@ -15,6 +15,7 @@ func _run() -> void:
 	test_share_line()
 	test_puzzle_data()
 	await preload("res://tests/extra_tests.gd").new().run(check, self)
+	await preload("res://tests/regression_tests.gd").new().run(check, self)
 
 
 func example() -> ShiftBoard:
