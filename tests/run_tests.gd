@@ -17,6 +17,7 @@ func _ready() -> void:
 	test_daily_dates()
 	test_share_line()
 	test_puzzle_data()
+	await preload("res://tests/extra_tests.gd").new().run(check, self)
 	print("tests: %d passed, %d failed" % [_passed, _failed])
 	get_tree().quit(1 if _failed > 0 else 0)
 
