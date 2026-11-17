@@ -89,7 +89,7 @@ difficulty; whether it stays visible is a phase 2 decision).
 
 ## 3. Levels
 
-Each level is generated with its own parameters (`ShiftGenerator.LEVELS`):
+Each level has its own generator parameters (`ShiftGenerator.LEVELS`):
 
 | Level | Board | Other pieces | Pins | Par band | Max shortest solutions | Layouts tried |
 |---|---|---|---|---|---|---|
