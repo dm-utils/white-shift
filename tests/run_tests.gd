@@ -63,8 +63,7 @@ func test_rules() -> void:
 
 
 func test_fast_swipe_matches_reference() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
+	var rng := WhiteRng.new(7)
 	var mismatches := 0
 	var checked := 0
 	for k in 300:
@@ -73,7 +72,7 @@ func test_fast_swipe_matches_reference() -> void:
 			continue
 		var s := b.start
 		for step in 12:
-			var dir := rng.randi_range(0, 3)
+			var dir := rng.range_int(0, 3)
 			var fast := b.swipe(s, dir)
 			if fast != b.swipe_reference(s, dir):
 				mismatches += 1

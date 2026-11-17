@@ -134,8 +134,7 @@ func test_exit_rules() -> void:
 
 
 func test_swipe_properties() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 99
+	var rng := WhiteRng.new(99)
 	var bad := 0
 	var n := 0
 	for k in 90:
@@ -144,7 +143,7 @@ func test_swipe_properties() -> void:
 			continue
 		var s: PackedInt32Array = b.start
 		for step in 10:
-			var dir := rng.randi_range(0, 3)
+			var dir := rng.range_int(0, 3)
 			var t: PackedInt32Array = b.swipe(s, dir)
 			n += 1
 			# idempotent: second swipe same way changes nothing; legal; input untouched

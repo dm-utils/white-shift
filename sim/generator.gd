@@ -24,8 +24,7 @@ static func seed_for(text: String) -> int:
 ## Returns {board, par, solutions, path, tries}.
 static func generate(seed_value: int, level: int) -> Dictionary:
 	var cfg: Dictionary = LEVELS[level]
-	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	var rng := WhiteRng.new(seed_value)
 	var best := {}
 	var best_score := -1000000000
 	for attempt in int(cfg.tries):
@@ -50,15 +49,15 @@ static func generate(seed_value: int, level: int) -> Dictionary:
 	return best
 
 
-static func random_board(rng: RandomNumberGenerator, cfg: Dictionary) -> ShiftBoard:
+static func random_board(rng: WhiteRng, cfg: Dictionary) -> ShiftBoard:
 	var sizes: Array = cfg.sizes
-	var n: int = sizes[rng.randi_range(0, sizes.size() - 1)]
-	var side := rng.randi_range(0, 3)
-	var board := ShiftBoard.create(n, n, side, rng.randi_range(0, n - 1))
+	var n: int = sizes[rng.range_int(0, sizes.size() - 1)]
+	var side := rng.range_int(0, 3)
+	var board := ShiftBoard.create(n, n, side, rng.range_int(0, n - 1))
 	var used := {}
-	var pin_count := rng.randi_range(cfg.pins[0], cfg.pins[1])
+	var pin_count := rng.range_int(cfg.pins[0], cfg.pins[1])
 	for k in pin_count:
-		var p := Vector2i(rng.randi_range(0, n - 1), rng.randi_range(0, n - 1))
+		var p := Vector2i(rng.range_int(0, n - 1), rng.range_int(0, n - 1))
 		if not used.has(p):
 			used[p] = true
 			board.pins.append(p)
@@ -67,16 +66,16 @@ static func random_board(rng: RandomNumberGenerator, cfg: Dictionary) -> ShiftBo
 		return null
 	used[white] = true
 	board.add(ShiftBoard.Kind.WHITE, white.x, white.y)
-	var want := rng.randi_range(cfg.pieces[0], cfg.pieces[1])
+	var want := rng.range_int(cfg.pieces[0], cfg.pieces[1])
 	var placed := 0
 	var guard := 0
 	while placed < want and guard < 200:
 		guard += 1
-		var roll := rng.randf()
+		var roll := rng.next_float()
 		var kind := ShiftBoard.Kind.BLOCK if roll < MIX[0] else ShiftBoard.Kind.HBAR if roll < MIX[0] + MIX[1] else ShiftBoard.Kind.VBAR
-		var length := 1 if kind == ShiftBoard.Kind.BLOCK else (2 if rng.randf() < 0.65 else 3)
-		var x := rng.randi_range(0, n - (length if kind == ShiftBoard.Kind.HBAR else 1))
-		var y := rng.randi_range(0, n - (length if kind == ShiftBoard.Kind.VBAR else 1))
+		var length := 1 if kind == ShiftBoard.Kind.BLOCK else (2 if rng.next_float() < 0.65 else 3)
+		var x := rng.range_int(0, n - (length if kind == ShiftBoard.Kind.HBAR else 1))
+		var y := rng.range_int(0, n - (length if kind == ShiftBoard.Kind.VBAR else 1))
 		var mine: Array[Vector2i] = []
 		for k in length:
 			mine.append(Vector2i(x + k, y) if kind == ShiftBoard.Kind.HBAR else Vector2i(x, y + k))
@@ -89,9 +88,9 @@ static func random_board(rng: RandomNumberGenerator, cfg: Dictionary) -> ShiftBo
 	return board
 
 
-static func _free_cell(rng: RandomNumberGenerator, n: int, used: Dictionary) -> Vector2i:
+static func _free_cell(rng: WhiteRng, n: int, used: Dictionary) -> Vector2i:
 	for k in 50:
-		var c := Vector2i(rng.randi_range(0, n - 1), rng.randi_range(0, n - 1))
+		var c := Vector2i(rng.range_int(0, n - 1), rng.range_int(0, n - 1))
 		if not used.has(c):
 			return c
 	return Vector2i(-1, -1)
