@@ -436,10 +436,31 @@ func _store() -> void:
 
 
 func _load_save() -> void:
-	if FileAccess.file_exists(SAVE):
-		var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
-		if d is Dictionary and d.get("days") is Dictionary:
-			_save = d
+	if not FileAccess.file_exists(SAVE):
+		return
+	var json := JSON.new()
+	# parse() returns an error code, unlike parse_string() it logs nothing
+	if json.parse(FileAccess.get_file_as_string(SAVE)) != OK or not json.data is Dictionary:
+		return
+	var d: Dictionary = json.data
+	var lang: Variant = d.get("lang")
+	if lang is String and Strings.TEXT.has(lang):
+		_save.lang = lang
+	var days: Variant = d.get("days")
+	if not days is Dictionary:
+		return
+	# keep what is usable per day and per level, drop the rest
+	for key in days:
+		if key is String and days[key] is Array:
+			var list := []
+			for e in days[key]:
+				var rec := ""
+				var ms := 0
+				if e is Dictionary:
+					rec = e["record"] if e.get("record") is String else ""
+					ms = maxi(0, int(e["time_ms"])) if e.get("time_ms") is float else 0
+				list.append({"record": rec, "time_ms": ms, "solved": false})
+			_save.days[key] = list
 
 
 func _write_save() -> void:

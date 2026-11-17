@@ -405,10 +405,8 @@ func test_ui_progress(node: Node) -> void:
 	await node.get_tree().process_frame
 	# corrupt save files must not stop the game from starting
 	var junk_saves := ["not json", "[1,2]", "{\"days\": 5}", "{\"days\": {\"2026-11-17\": []}}"]
-	# known open findings (see test report): structurally wrong saves crash _open_day; run with `-- --known`
-	if "--known" in OS.get_cmdline_user_args():
-		junk_saves += ["{\"days\": {\"2026-11-17\": [{}]}}", "{\"days\": {\"2026-11-17\": \"x\"}}",
-			"{\"days\": {\"2026-11-17\": [5]}}", "{\"days\": {}, \"lang\": \"fr\"}"]
+	junk_saves += ["{\"days\": {\"2026-11-17\": [{}]}}", "{\"days\": {\"2026-11-17\": \"x\"}}",
+		"{\"days\": {\"2026-11-17\": [5]}}", "{\"days\": {}, \"lang\": \"fr\"}"]
 	for junk in junk_saves:
 		var f := FileAccess.open(save, FileAccess.WRITE)
 		f.store_string(junk)
