@@ -358,8 +358,8 @@ Implementation on White Kit (kit design 5.12, kit ADR 0004):
   2. kit pin check: `addons/white_kit` must be exactly the commit of tag `v<VERSION>` of the kit; the version is
      written to the run summary;
   3. Godot 4.7.2 through the kit's composite action `addons/white_kit/ci/setup-godot` (SHA-512 verified, cached);
-  4. `--import`; kit tests (`res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=250`); game tests
-     (`res://tests/run_tests.tscn -- --min-checks=177`, the `MIN_CHECKS` variable);
+  4. `--import`; kit tests (`res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=522`); game tests
+     (`res://tests/run_tests.tscn -- --min-checks=192`, the `MIN_CHECKS` variable);
   5. report remaining daily puzzle days (warning below 14);
   6. export the Web build (release) as an artifact.
 - The export preset excludes `tests/*`, `tools/*`, `addons/white_kit/tests/*` and `addons/white_kit/tools/*`, so no
@@ -451,7 +451,7 @@ White Shift is built on White Kit, the shared base of the White daily puzzle gam
 - The wrappers `ShiftDaily`, `ShiftPuzzles`, `ShiftAttempt` and `Strings` stay because the tests call them by these
   names. Removing them is a separate task together with a test update.
 - Updating the kit follows the kit's procedure (kit design section 8): check out the new tag in the submodule, run
-  kit and game tests, commit `chore: update White Kit to v<new>`. A kit update must keep the 177 game checks green and
+  kit and game tests, commit `chore: update White Kit to v<new>`. A kit update must keep the 192 game checks green and
   the screenshots of the kit's migration acceptance pixel-identical, unless the kit's changelog announces a visible
   change.
 - Planned kit 0.2.0 (practice-only hook for White Tally, test runner counting script errors) needs no code change in

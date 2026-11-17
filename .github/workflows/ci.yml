@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 env:
-  MIN_CHECKS: "177" # the number of checks of the game's own tests, so skipped tests fail the build
+  MIN_CHECKS: "192" # the number of checks of the game's own tests, so skipped tests fail the build
 
 jobs:
   build:
@@ -43,7 +43,7 @@ jobs:
         run: timeout 600 godot --headless --path . --import
 
       - name: Kit tests
-        run: timeout 300 godot --headless --path . res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=250
+        run: timeout 300 godot --headless --path . res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=522
 
       - name: Game tests
         run: timeout 300 godot --headless --path . res://tests/run_tests.tscn -- --min-checks=${{ env.MIN_CHECKS }}

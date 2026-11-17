@@ -74,8 +74,8 @@ How code, tests, data and branches are handled in this repository. The design is
 
 ```bash
 godot --headless --path . --import
-timeout 300 godot --headless --path . res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=250
-timeout 300 godot --headless --path . res://tests/run_tests.tscn -- --min-checks=177
+timeout 300 godot --headless --path . res://addons/white_kit/tests/run_kit_tests.tscn -- --min-checks=522
+timeout 300 godot --headless --path . res://tests/run_tests.tscn -- --min-checks=192
 ```
 
 - The runner (`tests/run_tests.gd`, which extends White Kit's `WhiteTestRunner`) runs the `test_*` functions from
