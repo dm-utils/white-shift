@@ -7,7 +7,7 @@ Get the white stone out through the opening in the wall, in as few swipes as you
 Three puzzles a day (easy, medium, hard), the same for everyone, changing at midnight Dutch time.
 Every swipe counts, also the ones you take back.
 
-Play: https://play.whiteshift.steefbeest.nl
+Play: https://play.white-shift.steefbeest.nl
 
 ## Development
 

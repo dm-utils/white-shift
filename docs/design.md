@@ -1,6 +1,6 @@
 # White Shift - design
 
-Status: phase 1 (digital prototype), built and playable at https://play.whiteshift.steefbeest.nl. Built on White Kit
+Status: phase 1 (digital prototype), built and playable at https://play.white-shift.steefbeest.nl. Built on White Kit
 v0.1.0 since 2026-11-17 (section 13, ADR 0005).
 This document describes the game as decided and built. Decisions with their trade-offs are in `docs/adr/`;
 terms are defined in `docs/glossary.md`; code and test rules are in `docs/conventions.md`.
@@ -365,7 +365,7 @@ Implementation on White Kit (kit design 5.12, kit ADR 0004):
 - The export preset excludes `tests/*`, `tools/*`, `addons/white_kit/tests/*` and `addons/white_kit/tools/*`, so no
   test, fixture or tool code ships.
 - On `develop` (not on pull requests) the Web build is published to GitHub Pages, served at
-  https://play.whiteshift.steefbeest.nl (custom domain via a DNS record in the existing zone).
+  https://play.white-shift.steefbeest.nl (custom domain via a DNS record in the existing zone).
 - No Android or Windows builds in phase 1.
 - Cost: none (public repositories; Pages and Actions are free for public repositories).
 
@@ -424,7 +424,7 @@ UI and deployment (manual or screenshot)
 - Without a puzzle for today the game shows the no-puzzle message and practice works.
 - After a language toggle on a solved level, the Best route button shows the text of the new language.
 - CI on `develop` is green (kit pin, kit tests, game tests) and the play version at
-  https://play.whiteshift.steefbeest.nl loads and plays.
+  https://play.white-shift.steefbeest.nl loads and plays.
 
 ## 13. White Kit
 

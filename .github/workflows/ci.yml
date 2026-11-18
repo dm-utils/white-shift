@@ -1,5 +1,5 @@
 # CI: tests and the web build on develop/main, superseded runs cancelled. The release web build of develop is the
-# play version on GitHub Pages (play.whiteshift.steefbeest.nl). Prototype phase: no Android/Windows builds yet.
+# play version on GitHub Pages (play.white-shift.steefbeest.nl). Prototype phase: no Android/Windows builds yet.
 name: CI
 
 on:
